@@ -1,0 +1,179 @@
+# Created 2021-02-18 Thu 22:07
+#+TITLE: A functional approach to checking leap years
+#+AUTHOR: Benjamin Piper
+#+export_file_name: README
+#+property: header-args :noweb yes :results output :cache yes
+
+* Notes
+
+This document is a result of literate programming via org-babel in Emacs. That means:
+
+- All the work was created entirely in ~literate.org~
+- Which got /woven/ into documentation ~README.org~
+- And /tangled/ into source code ~is_leap_year.js~
+
+* How do we calculate a leap year?
+
+According to [[https://www.mathsisfun.com/leap-years.html][mathsisfun]], leap years have three properties:
+
+- Leap years are any that can be *exactly divided by 4*
+- Except if it can be *exactly divided by 100*, then it *isn't*
+- *Except if* it can be *exactly divided by 400*, then it *is*
+
+A simple approach would be like this:
+
+#+begin_src js
+  function isLeapYear(year) {
+      return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  }
+  console.log(isLeapYear(2000)); // >> true
+#+end_src
+
+However, a more functional way would be like this.
+
+#+name: leapyear-fn
+#+begin_src js
+  const isLeapYear = or(and(isDivisibleBy(4), notDivisibleBy(100)), isDivisibleBy(400));
+  console.log(isLeapYear(2000)); // >> true
+#+end_src
+
+* What?!
+
+Yeah, I know. A few of my friends have humourously called it "cursed". Mildly frustrated, I have made this website to explain it.
+
+** Arrow functions
+
+Let's start from square one.
+
+In order to construct ~isLeapYear~, I've made some arrow functions to help. An arrow function contains ~=>~ s. They come with a few quirks. Two differences that are immediately relevant are:
+
+- If they are only one statement, there is no need for ~return~ or curly braces.
+- They are a terser alternative of writing functions. As such, they are useful for writing /curried functions/.
+- And more can be seen on the [[https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions][MDN Web Docs]].
+
+#+begin_src js
+
+  const square = x => x * x;
+  const sum = (x, y) => x + y;
+  const getStringInitial = string => {
+      const firstLetter = string[0];
+      return firstLetter.toUpperCase();
+  }
+  console.log(square(2)); // >> 4
+  console.log(sum(2,3)); // >> 5
+  console.log(getStringInitial("hello")); // >> H
+#+end_src
+
+** Curried functions
+
+[[https://en.wikipedia.org/wiki/Currying][Curried functions]] are ones that can have their arguments called one at a time. With each call, a new function is returned. When all parameters have been supplied, the value is returned. Here's what happens when we curry the sum function that we defined earlier.
+
+#+begin_src js
+  const sum = x => y => x + y;
+  const add5 = sum(5);
+  const add24 = sum(24);
+
+  console.log(add5(10)); // >> 15
+  console.log(add24(18)); // >> 42
+  console.log(sum(5)(24)); // >> 29
+#+end_src
+
+In this manner, currying makes it easier to create callbacks: functions that are passed as parameters. This leads us to our first three callbacks.
+
+#+name: divisible-fns
+#+begin_src js
+  const not = boolFn => x => !boolFn(x);
+
+  const isDivisibleBy = divisor => number => number % divisor === 0;
+  const notDivisibleBy = compose(not, isDivisibleBy);
+#+end_src
+
+** Compose?
+
+Yep, in fact, you've probably already composed before. We're talking about [[https://en.wikipedia.org/wiki/Function_composition][Mathematical composition]] where /f follows g/.
+
+#+begin_src js
+  const square = x => x * x;
+  const sum = x => y => x + y;
+  const add5 = sum(5);
+  const add24 = sum(24);
+
+  const calc = x => add24(square(add5(x))); // How most people have done composition
+
+  const compose = (...fns) => input =>
+      fns.reduceRight((accumulator, nextFn) => nextFn(accumulator), input);
+
+  const calcV2 = x => compose(add24, square, add5)(x);
+  const calcV3 = compose(add24, square, add5);
+
+  const input = 2;
+  const expectedOutput = 73; // (2 + 5)^2 + 24 = 73
+  const allFnsAreEqual = [calc(input), calcV2(input), calcV3(input)]
+      .every(output => output === expectedOutput);
+
+  console.log(allFnsAreEqual); // => true
+#+end_src
+
+Ok, so the syntax for compose looks a little scary, but it's quite simple.
+
+- It takes an array of functions indicated by the rest parameter ~...~
+- Then it takes a single input.
+- Then starting from the right-most function: it takes the input, returns an output and then passes it onto the one on the left.
+- Finally it outputs.
+
+*BUT*, compose is curried. If you /don't/ provide said input, it returns a function. That's why ~calcV2~ and ~calcV3~ are equal.
+
+~calcV3~ is an example of [[https://en.wikipedia.org/wiki/Tacit_programmingpoint-free][point-free programming]]: functions that are created without specifying their parameters or intermediate variables. This is also the case with ~notDivisibleBy~ and ~isLeapYear~.
+
+*** Composing Boolean Functions
+
+Last but not least, let's explain ~and~ and ~or~.
+
+#+begin_src js
+  const isGreaterThan3 = x => x > 3;
+  const isLessThan5 = x => x < 5;
+  const isEqualTo10 = x => x === 10;
+
+  const and = (...boolFns) => input => boolFns.every(boolFn => boolFn(input));
+  const or = (...boolFns) => input => boolFns.some(boolFn => boolFn(input));
+
+  const between3And5 = and(isGreaterThan3, isLessThan5);
+  const is10OrLessThan5 = or(isEqualTo10, isLessThan5);
+
+  console.log(between3And5(4)); // >> true
+  console.log(is10OrLessThan5(10)); // >> true
+#+end_src
+
+- The ~every~ method returns true if *all* elements in an array pass the test.
+- The ~some~ method returns true if *at least one* element in an array passes the test.
+
+The test must be a boolean-returning callback. All I have done here is make the test about /the elements returning an output/ from the /specified input/. This is similar to the earlier-defined ~allFnsAreEqual~.
+
+* The Source Code
+
+You can also download this at ~is_leap_year.js~.
+
+#+begin_src js
+  const compose = (...fns) => input =>
+      fns.reduceRight((accumulator, nextFn) => nextFn(accumulator), input);
+
+  const and = (...boolFns) => input => boolFns.every(boolFn => boolFn(input));
+  const or = (...boolFns) => input => boolFns.some(boolFn => boolFn(input));
+  const not = boolFn => x => !boolFn(x);
+
+  const isDivisibleBy = divisor => number => number % divisor === 0;
+  const notDivisibleBy = compose(not, isDivisibleBy);
+
+  const isLeapYear = or(and(isDivisibleBy(4), notDivisibleBy(100)), isDivisibleBy(400));
+  console.log(isLeapYear(2000)); // >> true
+#+end_src
+
+* But why?
+
+Incoming subjective opinions. I find that:
+
+- Naming functions is easier than naming variables.
+- Composing functions is cleaner and communicates intent by hiding the syntax behind function names.
+- Point-free programming is easier to verify and validate (if not over-used). I have never had to test such functions in isolation.
+
+I also found that using functions like ~and~ and ~or~, already come with brackets, so there isn't a need to worry about order of operations. Maybe I should roll with a LISP language instead :D.
