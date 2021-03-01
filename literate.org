@@ -217,3 +217,5 @@ Incoming subjective opinions. I find that:
 - Point-free programming is easier to verify and validate (if not over-used). I have never had to test such functions in isolation.
 
 I also found that using functions like ~and~ and ~or~, already come with brackets, so there isn't a need to worry about order of operations. Maybe I should roll with a LISP language instead :D.
+
+If you'd like to use ~and~, ~or~ as well as explore more into this paradigm, I highly recommend using [[https://www.7urtle.com/][@7urtle/lambda]].
